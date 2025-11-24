@@ -104,7 +104,7 @@ if __name__ == '__main__':
                     y_train,y_valid,y_test = train[:,-1].astype(int),valid[:,-1].astype(int),test[:,-1].astype(int)
 
                     # For each number of baseline classifiers
-                    for n in [10]:#,30,50]:
+                    for n in [10,30,50]:
                         print('META TYPE {}, DATASET {}, FOLD {}, NUMBER OF CLASSIFIERS {} '.format(meta,d,f,n))
                         # Loading the baseline models
                         if (models_path != None):
