@@ -9,7 +9,7 @@ import argparse
 
 sys.path.append('.')
 
-from kmeans_ensemble import KMeansSemble
+from dbscan_ensemble import DBScanSemble
 from ensemble import Ensemble
 
 # Disable all types of warning
@@ -68,19 +68,19 @@ if __name__ == '__main__':
         sys.exit('Data folder does not exists. Please check if the path to the data is correct or already exists.')
 
     # Reading the datasets' folders
-    ds = [d for d in os.listdir(data) if os.path.isdir('{}/{}'.format(data,d))]
-    #ds = ['iris']
+    #ds = [d for d in os.listdir(data) if os.path.isdir('{}/{}'.format(data,d))]
+    ds = ['iris']
 
     # Auxiliary variables
     folds = output_folder = y_pred = meta_X = None
-    start_time_kmeans = end_time_kmeans = 0
-    kmeans_variants = ['mode','intracluster',] # kmeanssemble variants
+    start_time_dbscan = end_time_dbscan = 0
+    dbscan_variants = ['mode','intracluster',] # dbscansemble variants
     divergence = {'nodivergence':None,'yule':'yule','disagreement':'disagreement'} # The divergence metrics
     meta_data_type = {'oracle':'oracle','countclass':'count_class'} # The meta-data type of the classifiers predictions
     n_folds_ensemble = 10 # Number of folds to construct the meta-data from the baseline classifiers
 
-    n_clusters_list = [2,5,10,20,30] # List of k values to be tested to build the clusters
-    kmeans_ens = KMeansSemble() # KMeansEnsemble instance
+    radius_list = [1.0, 1.5, 2.0, 3.0, 4.0] # List of k values to be tested to build the clusters
+    dbscan_ens = DBScanSemble() # dbscanEnsemble instance
 
     # Performs the experiments for each meta data type
     for meta in meta_data_type:    
@@ -116,24 +116,24 @@ if __name__ == '__main__':
                         # Checks if the model's results folders already exist
                         baseline_results = '{}/{}/{}/{}/{}/results.txt'.format(results_folder,'baseline',d,f,n)
                         
-                        for v in kmeans_variants:
+                        for v in dbscan_variants:
                             if (meta=='countclass'):
-                                kmeanssemble_results = '{}/{}/{}/{}/{}/{}/results.txt'.format(results_folder,'kmeans_{}'.format(meta),v,d,f,n)
+                                dbscansemble_results = '{}/{}/{}/{}/{}/{}/results.txt'.format(results_folder,'dbscan_{}'.format(meta),v,d,f,n)
                             else:
-                                kmeanssemble_results = '{}/{}/{}/{}/{}/{}/results.txt'.format(results_folder,'kmeans_{}'.format(dv),v,d,f,n)
+                                dbscansemble_results = '{}/{}/{}/{}/{}/{}/results.txt'.format(results_folder,'dbscan_{}'.format(dv),v,d,f,n)
                             
-                        # Assigns the kmeanssemble's parameters
-                        kmeans_ens.n_models=n
-                        kmeans_ens.n_folds=n_folds_ensemble
-                        kmeans_ens.divergence=divergence[dv]
-                        kmeans_ens.ensemble = ens
-                        kmeans_ens.meta_data_mode = meta_data_type[meta]
+                        # Assigns the dbscansemble's parameters
+                        dbscan_ens.n_models=n
+                        dbscan_ens.n_folds=n_folds_ensemble
+                        dbscan_ens.divergence=divergence[dv]
+                        dbscan_ens.ensemble = ens
+                        dbscan_ens.meta_data_mode = meta_data_type[meta]
 
-                        # Training the kmeanssemble
-                        print('Building the meta-data of the kmeanssemble....')
-                        start_time_kmeans = time()
-                        meta_X = kmeans_ens.fit(X_train,y_train)
-                        end_time_kmeans = time() -start_time_kmeans                
+                        # Training the dbscansemble
+                        print('Building the meta-data of the dbscansemble....')
+                        start_time_dbscan = time()
+                        meta_X = dbscan_ens.fit(X_train,y_train)
+                        end_time_dbscan = time() -start_time_dbscan                
 
                         # Gets the baseline model's predictions
                         # Check if the baseline model's folder results already exists
@@ -144,37 +144,37 @@ if __name__ == '__main__':
                         if (not os.path.exists('{}/results.txt'.format(output_folder))):
                             print('Performing the test with the baseline models...')
                             # Getting the baseline predictions as array
-                            scores_baselines = dict2array(kmeans_ens.get_scores_baselines(X_test,y_test))
+                            scores_baselines = dict2array(dbscan_ens.get_scores_baselines(X_test,y_test))
                             # Saving the baseline's results y_pred
                             np.savetxt('{}/results.txt'.format(output_folder),scores_baselines,fmt='%s',delimiter=',',header='Model,Accuracy,F1')
                         else:
                             print('Folder {} already exists with all the validation metrics...'.format(output_folder))
                         
-                        # Test with the kmeanssemble and its variants
-                        for v in kmeans_variants:
-                            print('KMeans variant: ',v)
+                        # Test with the dbscansemble and its variants
+                        for v in dbscan_variants:
+                            print('DBScansemble variant: ',v)
                             # Check if the output folder exists
                             if (meta=='countclass'):
-                                output_folder = '{}/{}/{}/{}/{}/{}'.format(results_folder,'kmeans_{}'.format(meta),v,d,f,n)
+                                output_folder = '{}/{}/{}/{}/{}/{}'.format(results_folder,'dbscan_{}'.format(meta),v,d,f,n)
                             else:
-                                output_folder = '{}/{}/{}/{}/{}/{}'.format(results_folder,'kmeans_{}'.format(dv),v,d,f,n)
+                                output_folder = '{}/{}/{}/{}/{}/{}'.format(results_folder,'dbscan_{}'.format(dv),v,d,f,n)
                             if (not os.path.exists(output_folder)):
                                 os.makedirs(output_folder)
                             
                             if(os.path.exists('{}/results.txt'.format(output_folder))):
-                                print('Folder {} already exists. Moving to the next KMeans variant...'.format(output_folder))
+                                print('Folder {} already exists. Moving to the next dbscan variant...'.format(output_folder))
                                 continue
 
                             # Seeks the best value for k_max using the validation set
                             best_k_max = None
                             highest_f1 = -1
                             k_max_valid = []
-                            for k_max in n_clusters_list:
+                            for k_max in radius_list:
                                 start_time_unsup = time()
-                                kmeans_ens.fit_meta_model(meta_X,k_max)
+                                dbscan_ens.fit_meta_model(meta_X,k_max)
                                 end_time_unsup = time() - start_time_unsup
 
-                                y_pred = kmeans_ens.predict(X_valid,voting=v)
+                                y_pred = dbscan_ens.predict(X_valid,voting=v)
                                 f1 = f1_score(y_valid,y_pred,average='weighted')
 
                                 if (f1 > highest_f1):
@@ -184,17 +184,17 @@ if __name__ == '__main__':
                                 k_max_valid.append([k_max,f1,end_time_unsup])
 
                             # Saving the tested n_clusters values and their F1 scores
-                            np.savetxt('{}/n_clusters_validation.txt'.format(output_folder),np.array(k_max_valid),fmt='%.4f',delimiter=',',header='n_clusters,F1,Meta model time')
+                            np.savetxt('{}/radius_validation.txt'.format(output_folder),np.array(k_max_valid),fmt='%.4f',delimiter=',',header='n_clusters,F1,Meta model time')
 
-                            # KMeanssemble predictions using the test set and the best n_clusters value
-                            kmeans_ens.fit_meta_model(meta_X,n_clusters=best_k_max)
-                            y_pred = kmeans_ens.predict(X_test,voting=v)
+                            # dbscansemble predictions using the test set and the best radius value
+                            dbscan_ens.fit_meta_model(meta_X,radius=best_k_max)
+                            y_pred = dbscan_ens.predict(X_test,voting=v)
                             # Computing accuracy and f1-score
                             acc = accuracy_score(y_test,y_pred)
                             f1 = f1_score(y_test,y_pred,average='weighted')
                             # Saving the validation measures, the meta_X and y_pred
                             np.savetxt('{}/y_pred.txt'.format(output_folder),y_pred,fmt='%.4f',delimiter=',')
                             np.savetxt('{}/meta_X.txt'.format(output_folder),meta_X,fmt='%.4f',delimiter=',')
-                            np.savetxt('{}/results.txt'.format(output_folder),np.array([acc,f1,end_time_kmeans]),fmt='%.4f',delimiter=',',header='Accuracy,F1,Fit time')                    
+                            np.savetxt('{}/results.txt'.format(output_folder),np.array([acc,f1,end_time_dbscan]),fmt='%.4f',delimiter=',',header='Accuracy,F1,Fit time')                    
                             # Saving the clusters and their prototypes
-                            kmeans_ens.save_clusters(output_folder)
+                            dbscan_ens.save_clusters(output_folder)

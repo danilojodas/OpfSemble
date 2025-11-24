@@ -14,7 +14,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
 from scipy.stats import mode
 from ensemble import Ensemble
 from sklearn.metrics import accuracy_score,f1_score
@@ -27,9 +27,9 @@ import sys
 import logging
 logging.disable(sys.maxsize)
 
-class KMeansSemble:
+class DBScanSemble:
     """
-    A class which implements the KMeans Ensemble Learning.
+    A class which implements the DBScan Ensemble Learning.
     """
 
     def __init__(self, n_models=10, n_folds=10,n_classes=0,ensemble=None,meta_data_mode='count_class',divergence=None,bootstrapping=False,random_state=None):
@@ -330,44 +330,56 @@ class KMeansSemble:
         return pred.reshape(-1,1)
 
     # fit a meta model
-    def fit_meta_model(self, X, n_clusters=3):
+    def fit_meta_model(self, X, radius=3):
         """
-        Perform the k-means clustering over the classifiers attributes and returns the prototype classifiers
+        Perform the DBSCAN clustering over the classifiers attributes and returns the prototype classifiers
 
         Parameters
         ----------
         X: array
             A 2D array with the classifiers attributes
-        k_max: int
-            The value of k_max for the Unsupervised OPF
+        radius: float
+            The value of radius to be used in the DBSCAN algorithm
         """
 
         try:
-            kmeans = KMeans(n_clusters=n_clusters)
-            kmeans.fit(X)
+            dbscan = DBSCAN(eps=radius)
+            dbscan.fit(X)
 
-            labels = kmeans.labels_
+            labels = dbscan.labels_
+            unique_labels = np.unique(labels)
+
+            n_clusters = len(unique_labels)
+            print(f'Unique labels: {unique_labels}')
+            print(f'Labels: {labels}')
 
             centroids_idx = []
             clusters = defaultdict(list)
 
             # Iterate over each cluster
-            for i in range(n_clusters):
-                # Getting the centroids of each cluster
-                cluster_indices = np.where(labels == i)[0]
-                
-                if len(cluster_indices) > 0:
-                    # Get the centroid for the current cluster
-                    centroid = kmeans.cluster_centers_[i]
-                    # Find the index of the classifier closest to the centroid
-                    distances = np.linalg.norm(X[cluster_indices] - centroid, axis=1)
-                    closest_index = cluster_indices[np.argmin(distances)]
-                    centroids_idx.append(closest_index)
+            for i, cluster_id in enumerate(unique_labels):
+                # Check if the cluster is noise
+                if cluster_id == -1:
+                    continue
 
+                # Getting the centroids of each cluster
+                cluster_indices = np.where(labels == cluster_id)[0]
+                if len(cluster_indices) == 0:
+                    continue
+
+                cluster_points = X[cluster_indices]
+
+                centroid = np.mean(cluster_points, axis=0)
+
+                # Find the index of the classifier closest to the centroid
+                distances = np.linalg.norm(X[cluster_indices] - centroid, axis=1)
+                closest_index = cluster_indices[np.argmin(distances)]
+                centroids_idx.append(closest_index)
+
+                for j in range(len(cluster_indices)):
+                    self.ensemble.items[cluster_indices[j]].cluster_id = closest_index
                     # Adding models to the corresponding centroid in order to form a dictionary of clusters
-                    for j in range(len(cluster_indices)):
-                        clusters[closest_index].append(self.ensemble.items[cluster_indices[j]].classifier)
-                        self.ensemble.items[cluster_indices[j]].cluster_id = closest_index
+                    clusters[closest_index].append(self.ensemble.items[cluster_indices[j]].classifier)
 
             centroids = dict()
             centroids_scores = dict()   
