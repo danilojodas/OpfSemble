@@ -68,8 +68,8 @@ if __name__ == '__main__':
         sys.exit('Data folder does not exists. Please check if the path to the data is correct or already exists.')
 
     # Reading the datasets' folders
-    #ds = [d for d in os.listdir(data) if os.path.isdir('{}/{}'.format(data,d))]
-    ds = ['iris']
+    ds = [d for d in os.listdir(data) if os.path.isdir('{}/{}'.format(data,d))]
+    #ds = ['original']
 
     # Auxiliary variables
     folds = output_folder = y_pred = meta_X = None
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     meta_data_type = {'oracle':'oracle','countclass':'count_class'} # The meta-data type of the classifiers predictions
     n_folds_ensemble = 10 # Number of folds to construct the meta-data from the baseline classifiers
 
-    radius_list = [1.0, 1.5, 2.0, 3.0, 4.0] # List of k values to be tested to build the clusters
+    radius_list = [2,5,10,20,30] # List of k values to be tested to build the clusters
     dbscan_ens = DBScanSemble() # dbscanEnsemble instance
 
     # Performs the experiments for each meta data type
@@ -174,14 +174,19 @@ if __name__ == '__main__':
                                 dbscan_ens.fit_meta_model(meta_X,k_max)
                                 end_time_unsup = time() - start_time_unsup
 
-                                y_pred = dbscan_ens.predict(X_valid,voting=v)
-                                f1 = f1_score(y_valid,y_pred,average='weighted')
+                                try:
+                                    y_pred = dbscan_ens.predict(X_valid,voting=v)
 
-                                if (f1 > highest_f1):
-                                    highest_f1 = f1
-                                    best_k_max = k_max
+                                    f1 = f1_score(y_valid,y_pred,average='weighted')
 
-                                k_max_valid.append([k_max,f1,end_time_unsup])
+                                    if (f1 > highest_f1):
+                                        highest_f1 = f1
+                                        best_k_max = k_max
+
+                                    k_max_valid.append([k_max,f1,end_time_unsup])
+                                except:
+                                    k_max_valid.append([k_max,0,end_time_unsup])
+                                    continue
 
                             # Saving the tested n_clusters values and their F1 scores
                             np.savetxt('{}/radius_validation.txt'.format(output_folder),np.array(k_max_valid),fmt='%.4f',delimiter=',',header='n_clusters,F1,Meta model time')
